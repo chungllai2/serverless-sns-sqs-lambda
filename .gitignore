@@ -12,7 +12,8 @@ node_modules
 .history
 
 # tsc output
-dist
+# dist
+# for my version, just skip this part
 
 #misc
 yarn-error.log
