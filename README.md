@@ -89,7 +89,7 @@ plugins:
   - "@agiledigital/serverless-sns-sqs-lambda"
 ```
 
-FIFO example,
+FIFO example as follows,
 
      This feature provides higher transactions per second (TPS) for messages in FIFO queues. To use high throughput FIFO, enable this option. Enabling high throughput FIFO sets the related options as follows:
         deduplicationScope is set to messageGroup.
