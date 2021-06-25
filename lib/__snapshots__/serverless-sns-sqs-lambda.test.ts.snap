@@ -127,7 +127,7 @@ Object {
         "KmsDataKeyReusePeriodSeconds": 200,
         "KmsMasterKeyId": "some key",
         "MessageRetentionPeriod": 1209600,
-        "QueueName": "some prefixsome-nameDeadLetterQueue",
+        "QueueName": "some prefixsome-nameDeadLetterQueue.fifo",
       },
       "Type": "AWS::SQS::Queue",
     },
@@ -138,7 +138,7 @@ Object {
         "FifoThroughputLimit": "perMessageGroupId",
         "KmsDataKeyReusePeriodSeconds": 200,
         "KmsMasterKeyId": "some key",
-        "QueueName": "some prefixsome-nameQueue",
+        "QueueName": "some prefixsome-nameQueue.fifo",
         "RedrivePolicy": Object {
           "deadLetterTargetArn": Object {
             "Fn::GetAtt": Array [

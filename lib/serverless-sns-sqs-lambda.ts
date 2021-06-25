@@ -33,6 +33,8 @@ type Config = {
   deadLetterQueueOverride: JsonObject;
   eventSourceMappingOverride: JsonObject;
   subscriptionOverride: JsonObject;
+  iamRoleName: string;
+  fifoSuffix: string;
 };
 
 /**
@@ -319,7 +321,9 @@ Usage
       mainQueueOverride: config.mainQueueOverride ?? {},
       deadLetterQueueOverride: config.deadLetterQueueOverride ?? {},
       eventSourceMappingOverride: config.eventSourceMappingOverride ?? {},
-      subscriptionOverride: config.subscriptionOverride ?? {}
+      subscriptionOverride: config.subscriptionOverride ?? {},
+      iamRoleName: config.iamRoleName ?? "IamRoleLambdaExecution",
+      fifoSuffix: config.fifoQueue ? ".fifo" : ""
     };
   }
 
@@ -382,13 +386,14 @@ Usage
       fifoThroughputLimit,
       deduplicationScope,
       deadLetterMessageRetentionPeriodSeconds,
-      deadLetterQueueOverride
+      deadLetterQueueOverride,
+      fifoSuffix
     }
   ) {
     template.Resources[`${name}DeadLetterQueue`] = {
       Type: "AWS::SQS::Queue",
       Properties: {
-        QueueName: `${prefix}${name}DeadLetterQueue`,
+        QueueName: `${prefix}${name}DeadLetterQueue${fifoSuffix}`,
         ...(kmsMasterKeyId !== undefined
           ? {
               KmsMasterKeyId: kmsMasterKeyId
@@ -401,19 +406,20 @@ Usage
           : {}),
         ...(fifoQueue !== undefined
           ? {
-              FifoQueue: fifoQueue
+              FifoQueue: fifoQueue,
+              ...(fifoThroughputLimit !== undefined
+                ? {
+                    FifoThroughputLimit: fifoThroughputLimit
+                  }
+                : {}),
+              ...(deduplicationScope !== undefined
+                ? {
+                    DeduplicationScope: deduplicationScope
+                  }
+                : {})
             }
           : {}),
-        ...(fifoThroughputLimit !== undefined
-          ? {
-              FifoThroughputLimit: fifoThroughputLimit
-            }
-          : {}),
-        ...(deduplicationScope !== undefined
-          ? {
-              DeduplicationScope: deduplicationScope
-            }
-          : {}),
+
         ...(deadLetterMessageRetentionPeriodSeconds !== undefined
           ? {
               MessageRetentionPeriod: deadLetterMessageRetentionPeriodSeconds
@@ -444,13 +450,14 @@ Usage
       fifoThroughputLimit,
       deduplicationScope,
       visibilityTimeout,
-      mainQueueOverride
+      mainQueueOverride,
+      fifoSuffix
     }: Config
   ) {
     template.Resources[`${name}Queue`] = {
       Type: "AWS::SQS::Queue",
       Properties: {
-        QueueName: `${prefix}${name}Queue`,
+        QueueName: `${prefix}${name}Queue${fifoSuffix}`,
         RedrivePolicy: {
           deadLetterTargetArn: {
             "Fn::GetAtt": [`${name}DeadLetterQueue`, "Arn"]
@@ -469,19 +476,20 @@ Usage
           : {}),
         ...(fifoQueue !== undefined
           ? {
-              FifoQueue: fifoQueue
+              FifoQueue: fifoQueue,
+              ...(fifoThroughputLimit !== undefined
+                ? {
+                    FifoThroughputLimit: fifoThroughputLimit
+                  }
+                : {}),
+              ...(deduplicationScope !== undefined
+                ? {
+                    DeduplicationScope: deduplicationScope
+                  }
+                : {})
             }
           : {}),
-        ...(fifoThroughputLimit !== undefined
-          ? {
-              FifoThroughputLimit: fifoThroughputLimit
-            }
-          : {}),
-        ...(deduplicationScope !== undefined
-          ? {
-              DeduplicationScope: deduplicationScope
-            }
-          : {}),
+
         ...(visibilityTimeout !== undefined
           ? {
               VisibilityTimeout: visibilityTimeout
@@ -499,13 +507,16 @@ Usage
    * @param {{name, prefix, topicArn}} config including name of the queue, the
    *  resource prefix and the arn of the topic
    */
-  addEventQueuePolicy(template, { name, prefix, topicArn }: Config) {
+  addEventQueuePolicy(
+    template,
+    { name, prefix, topicArn, fifoSuffix }: Config
+  ) {
     template.Resources[`${name}QueuePolicy`] = {
       Type: "AWS::SQS::QueuePolicy",
       Properties: {
         PolicyDocument: {
           Version: "2012-10-17",
-          Id: `${prefix}${name}Queue`,
+          Id: `${prefix}${name}Queue${fifoSuffix}`,
           Statement: [
             {
               Sid: `${prefix}${name}Sid`,
@@ -562,24 +573,24 @@ Usage
    * @param {object} template the template which gets mutated
    * @param {{name, prefix}} config the name of the queue the lambda is subscribed to
    */
-  addLambdaSqsPermissions(template, { name, prefix }) {
-    template.Resources.IamRoleLambdaExecution.Properties.Policies[0].PolicyDocument.Statement.push(
-      {
-        Effect: "Allow",
-        Action: [
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes"
-        ],
-        Resource: [
-          {
-            "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue`
-          },
-          {
-            "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue`
-          }
-        ]
-      }
-    );
+  addLambdaSqsPermissions(template, { name, prefix, iamRoleName, fifoSuffix }) {
+    template.Resources[
+      iamRoleName
+    ].Properties.Policies[0].PolicyDocument.Statement.push({
+      Effect: "Allow",
+      Action: [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes"
+      ],
+      Resource: [
+        {
+          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix}`
+        },
+        {
+          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix}`
+        }
+      ]
+    });
   }
 }
