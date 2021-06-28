@@ -179,3 +179,4 @@ make the key camel case ("maximumMessageSize") and pass it into the override sec
           mainQueueOverride:
             maximumMessageSize: 1024
 ```
+ 
