@@ -33,7 +33,7 @@ var parseIntOr = function (intString, defaultInt) {
  *
  * @param {isFifoQueue} boolean
  */
-var fifoSuffix = function (isFifoQueue) { return isFifoQueue === true ? ".fifo" : ""; };
+var fifoSuffix = function (isFifoQueue) { return (isFifoQueue === true ? ".fifo" : ""); };
 /**
  * Converts a string from camelCase to PascalCase. Basically, it just
  * capitalises the first letter.
@@ -71,6 +71,8 @@ var pascalCaseAllKeys = function (jsonObject) {
  *             isFifoQueue: true,
  *             fifoThroughputLimit: perMessageGroupId,
  *             deduplicationScope: messageGroup,
+ *             iamRoleName: LambdaRole,
+ *             isDisableDLQ: true,
  *             deadLetterMessageRetentionPeriodSeconds: 1209600
  *             visibilityTimeout: 120
  *             rawMessageDelivery: true
@@ -130,7 +132,9 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
                 mainQueueOverride: { type: "object" },
                 deadLetterQueueOverride: { type: "object" },
                 eventSourceMappingOverride: { type: "object" },
-                subscriptionOverride: { type: "object" }
+                subscriptionOverride: { type: "object" },
+                iamRoleName: { type: "string" },
+                isDisableDLQ: { type: "boolean" }
             },
             required: ["name", "topicArn"],
             additionalProperties: false
@@ -282,12 +286,14 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
             Type: "AWS::SQS::Queue",
             Properties: __assign(__assign(__assign(__assign(__assign(__assign({ QueueName: "" + prefix + name + "Queue" + fifoSuffix(isFifoQueue) }, (isDisableDLQ
                 ? {}
-                : { RedrivePolicy: {
+                : {
+                    RedrivePolicy: {
                         deadLetterTargetArn: {
                             "Fn::GetAtt": [name + "DeadLetterQueue", "Arn"]
                         },
                         maxReceiveCount: maxRetryCount
-                    } })), (kmsMasterKeyId !== undefined
+                    }
+                })), (kmsMasterKeyId !== undefined
                 ? {
                     KmsMasterKeyId: kmsMasterKeyId
                 }
@@ -378,9 +384,11 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
                 {
                     "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:" + prefix + name + "Queue" + fifoSuffix(isFifoQueue)
                 },
-                (isDisableDLQ ? {} : {
-                    "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:" + prefix + name + "DeadLetterQueue" + fifoSuffix(isFifoQueue)
-                })
+                isDisableDLQ
+                    ? {}
+                    : {
+                        "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:" + prefix + name + "DeadLetterQueue" + fifoSuffix(isFifoQueue)
+                    }
             ]
         });
     };

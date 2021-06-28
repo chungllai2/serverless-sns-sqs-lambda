@@ -59,24 +59,24 @@ functions:
               - dog
               - cat
 
-            # Overrides for generated CloudFormation templates
-            # Mirrors the CloudFormation docs but uses camel case instead of title case
-            #
-            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html
-            mainQueueOverride:
-              maximumMessageSize: 1024
-              ...
-            deadLetterQueueOverride:
-              maximumMessageSize: 1024
-              ...
-            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-eventsourcemapping.html
-            eventSourceMappingOverride:
-              sourceAccessConfigurations:
-                - Type: SASL_SCRAM_256_AUTH
-                  URI: arn:aws:secretsmanager:us-east-1:01234567890:secret:MyBrokerSecretName
-            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html
-            subscriptionOverride:
-              region: ap-southeast-2
+          # Overrides for generated CloudFormation templates
+          # Mirrors the CloudFormation docs but uses camel case instead of title case
+          #
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html
+          mainQueueOverride:
+            maximumMessageSize: 1024
+            ...
+          deadLetterQueueOverride:
+            maximumMessageSize: 1024
+            ...
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-eventsourcemapping.html
+          eventSourceMappingOverride:
+            sourceAccessConfigurations:
+              - Type: SASL_SCRAM_256_AUTH
+                URI: arn:aws:secretsmanager:us-east-1:01234567890:secret:MyBrokerSecretName
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html
+          subscriptionOverride:
+            region: ap-southeast-2
 
 # Config SNS, can ommit if not necessary
 resources:
@@ -115,6 +115,8 @@ functions:
           isFifoQueue: true;                                 # optional - AWS default is false
           fifoThroughputLimit: perMessageGroupId;          # optional - value : perQueue || perMessageGroupId
           deduplicationScope: messageGroup;                # optional - value : queue || messageGroup
+          iamRoleName: LambdaRole # default is IamRoleLambdaExecution
+          isDisableDLQ: true # optional - default is false
           deadLetterMessageRetentionPeriodSeconds: 1209600 # optional - AWS default is 345600 secs (4 days)
           visibilityTimeout: 120 # optional (in seconds) - AWS default is 30 secs
           rawMessageDelivery: true # Optional - default value is true
@@ -124,27 +126,25 @@ functions:
               - dog
               - cat
 
-            # Overrides for generated CloudFormation templates
-            # Mirrors the CloudFormation docs but uses camel case instead of title case
-            #
-            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html
-            mainQueueOverride:
-              maximumMessageSize: 1024
-              ...
-            deadLetterQueueOverride:
-              maximumMessageSize: 1024
-              ...
-            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-eventsourcemapping.html
-            eventSourceMappingOverride:
-              sourceAccessConfigurations:
-                - Type: SASL_SCRAM_256_AUTH
-                  URI: arn:aws:secretsmanager:us-east-1:01234567890:secret:MyBrokerSecretName
-            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html
-            subscriptionOverride:
-              region: ap-southeast-2
-            iamRoleName: LambdaRole # default is IamRoleLambdaExecution
-            isDisableDLQ: true # optional - default is false
-              
+          # Overrides for generated CloudFormation templates
+          # Mirrors the CloudFormation docs but uses camel case instead of title case
+          #
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html
+          mainQueueOverride:
+            maximumMessageSize: 1024
+            ...
+          deadLetterQueueOverride:
+            maximumMessageSize: 1024
+            ...
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-eventsourcemapping.html
+          eventSourceMappingOverride:
+            sourceAccessConfigurations:
+              - Type: SASL_SCRAM_256_AUTH
+                URI: arn:aws:secretsmanager:us-east-1:01234567890:secret:MyBrokerSecretName
+          # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html
+          subscriptionOverride:
+            region: ap-southeast-2
+
 # Config SNS, can ommit if not necessary
 resources:
   Resources:
@@ -179,4 +179,3 @@ make the key camel case ("maximumMessageSize") and pass it into the override sec
           mainQueueOverride:
             maximumMessageSize: 1024
 ```
- 

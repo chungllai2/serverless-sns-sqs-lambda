@@ -56,11 +56,10 @@ const parseIntOr = (intString, defaultInt) => {
 
 /**
  * Determine the suffix by isFifoQueue Config
- * 
- * @param {isFifoQueue} boolean 
+ *
+ * @param {isFifoQueue} boolean
  */
-const fifoSuffix = (isFifoQueue) => isFifoQueue === true ? ".fifo": "";
-
+const fifoSuffix = isFifoQueue => (isFifoQueue === true ? ".fifo" : "");
 
 /**
  * Converts a string from camelCase to PascalCase. Basically, it just
@@ -102,6 +101,8 @@ const pascalCaseAllKeys = (jsonObject: JsonObject): JsonObject =>
  *             isFifoQueue: true,
  *             fifoThroughputLimit: perMessageGroupId,
  *             deduplicationScope: messageGroup,
+ *             iamRoleName: LambdaRole,
+ *             isDisableDLQ: true,
  *             deadLetterMessageRetentionPeriodSeconds: 1209600
  *             visibilityTimeout: 120
  *             rawMessageDelivery: true
@@ -169,7 +170,9 @@ export default class ServerlessSnsSqsLambda {
         mainQueueOverride: { type: "object" },
         deadLetterQueueOverride: { type: "object" },
         eventSourceMappingOverride: { type: "object" },
-        subscriptionOverride: { type: "object" }
+        subscriptionOverride: { type: "object" },
+        iamRoleName: { type: "string" },
+        isDisableDLQ: { type: "boolean" }
       },
       required: ["name", "topicArn"],
       additionalProperties: false
@@ -333,7 +336,8 @@ Usage
       eventSourceMappingOverride: config.eventSourceMappingOverride ?? {},
       subscriptionOverride: config.subscriptionOverride ?? {},
       iamRoleName: config.iamRoleName ?? "IamRoleLambdaExecution",
-      isDisableDLQ: config.isDisableDLQ !== undefined ? config.isDisableDLQ: false,
+      isDisableDLQ:
+        config.isDisableDLQ !== undefined ? config.isDisableDLQ : false
     };
   }
 
@@ -401,11 +405,13 @@ Usage
       isDisableDLQ
     }
   ) {
-    if(!isDisableDLQ){
+    if (!isDisableDLQ) {
       template.Resources[`${name}DeadLetterQueue`] = {
         Type: "AWS::SQS::Queue",
         Properties: {
-          QueueName: `${prefix}${name}DeadLetterQueue${fifoSuffix(isFifoQueue)}`,
+          QueueName: `${prefix}${name}DeadLetterQueue${fifoSuffix(
+            isFifoQueue
+          )}`,
           ...(kmsMasterKeyId !== undefined
             ? {
                 KmsMasterKeyId: kmsMasterKeyId
@@ -431,7 +437,7 @@ Usage
                   : {})
               }
             : {}),
-  
+
           ...(deadLetterMessageRetentionPeriodSeconds !== undefined
             ? {
                 MessageRetentionPeriod: deadLetterMessageRetentionPeriodSeconds
@@ -464,7 +470,7 @@ Usage
       deduplicationScope,
       visibilityTimeout,
       mainQueueOverride,
-      isDisableDLQ,
+      isDisableDLQ
     }: Config
   ) {
     template.Resources[`${name}Queue`] = {
@@ -473,12 +479,14 @@ Usage
         QueueName: `${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`,
         ...(isDisableDLQ
           ? {}
-          : {RedrivePolicy: {
-          deadLetterTargetArn: {
-            "Fn::GetAtt": [`${name}DeadLetterQueue`, "Arn"]
-          },
-          maxReceiveCount: maxRetryCount
-        }}),
+          : {
+              RedrivePolicy: {
+                deadLetterTargetArn: {
+                  "Fn::GetAtt": [`${name}DeadLetterQueue`, "Arn"]
+                },
+                maxReceiveCount: maxRetryCount
+              }
+            }),
         ...(kmsMasterKeyId !== undefined
           ? {
               KmsMasterKeyId: kmsMasterKeyId
@@ -588,7 +596,10 @@ Usage
    * @param {object} template the template which gets mutated
    * @param {{name, prefix, iamRoleName, isFifoQueue, isDisableDLQ}} config the name of the queue the lambda is subscribed to
    */
-  addLambdaSqsPermissions(template, { name, prefix, iamRoleName, isFifoQueue, isDisableDLQ }) {
+  addLambdaSqsPermissions(
+    template,
+    { name, prefix, iamRoleName, isFifoQueue, isDisableDLQ }
+  ) {
     template.Resources[
       iamRoleName
     ].Properties.Policies[0].PolicyDocument.Statement.push({
@@ -600,11 +611,17 @@ Usage
       ],
       Resource: [
         {
-          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`
+          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix(
+            isFifoQueue
+          )}`
         },
-        (isDisableDLQ ? {} :{
-          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix(isFifoQueue)}`
-        })
+        isDisableDLQ
+          ? {}
+          : {
+              "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix(
+                isFifoQueue
+              )}`
+            }
       ]
     });
   }
