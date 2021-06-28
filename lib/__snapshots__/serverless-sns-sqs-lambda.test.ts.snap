@@ -156,6 +156,274 @@ Object {
 }
 `;
 
+exports[`Test Serverless SNS SQS Lambda when all parameters are provided should produce valid SQS FIFO with self-define lambda role CF template items 1`] = `
+Object {
+  "Resources": Object {
+    "LambdaRole": Object {
+      "Properties": Object {
+        "Policies": Array [
+          Object {
+            "PolicyDocument": Object {
+              "Statement": Array [
+                Object {
+                  "Action": Array [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": Array [
+                    Object {
+                      "Fn::Sub": "arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:some prefixsome-nameQueue.fifo",
+                    },
+                    Object {
+                      "Fn::Sub": "arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:some prefixsome-nameDeadLetterQueue.fifo",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    "Subscribesome-nameTopic": Object {
+      "Properties": Object {
+        "Endpoint": Object {
+          "Fn::GetAtt": Array [
+            "some-nameQueue",
+            "Arn",
+          ],
+        },
+        "FilterPolicy": Object {
+          "pet": Array [
+            "dog",
+            "cat",
+          ],
+        },
+        "Protocol": "sqs",
+        "RawMessageDelivery": true,
+        "TopicArn": "arn:aws:sns:us-east-2:123456789012:MyTopic",
+      },
+      "Type": "AWS::SNS::Subscription",
+    },
+    "Test-functionEventSourceMappingSQSsome-nameQueue": Object {
+      "DependsOn": "LambdaRole",
+      "Properties": Object {
+        "BatchSize": 7,
+        "Enabled": "False",
+        "EventSourceArn": Object {
+          "Fn::GetAtt": Array [
+            "some-nameQueue",
+            "Arn",
+          ],
+        },
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "Test-functionLambdaFunction",
+            "Arn",
+          ],
+        },
+        "MaximumBatchingWindowInSeconds": 99,
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
+    "some-nameDeadLetterQueue": Object {
+      "Properties": Object {
+        "DeduplicationScope": "messageGroup",
+        "FifoQueue": true,
+        "FifoThroughputLimit": "perMessageGroupId",
+        "KmsDataKeyReusePeriodSeconds": 200,
+        "KmsMasterKeyId": "some key",
+        "MessageRetentionPeriod": 1209600,
+        "QueueName": "some prefixsome-nameDeadLetterQueue.fifo",
+      },
+      "Type": "AWS::SQS::Queue",
+    },
+    "some-nameQueue": Object {
+      "Properties": Object {
+        "DeduplicationScope": "messageGroup",
+        "FifoQueue": true,
+        "FifoThroughputLimit": "perMessageGroupId",
+        "KmsDataKeyReusePeriodSeconds": 200,
+        "KmsMasterKeyId": "some key",
+        "QueueName": "some prefixsome-nameQueue.fifo",
+        "RedrivePolicy": Object {
+          "deadLetterTargetArn": Object {
+            "Fn::GetAtt": Array [
+              "some-nameDeadLetterQueue",
+              "Arn",
+            ],
+          },
+          "maxReceiveCount": 4,
+        },
+        "VisibilityTimeout": 999,
+      },
+      "Type": "AWS::SQS::Queue",
+    },
+    "some-nameQueuePolicy": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Id": "some prefixsome-nameQueue.fifo",
+          "Statement": Array [
+            Object {
+              "Action": "SQS:SendMessage",
+              "Condition": Object {
+                "ArnEquals": Object {
+                  "aws:SourceArn": Array [
+                    "arn:aws:sns:us-east-2:123456789012:MyTopic",
+                  ],
+                },
+              },
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": "*",
+              },
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "some-nameQueue",
+                  "Arn",
+                ],
+              },
+              "Sid": "some prefixsome-nameSid",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": Array [
+          Object {
+            "Ref": "some-nameQueue",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+  },
+}
+`;
+
+exports[`Test Serverless SNS SQS Lambda when all parameters are provided should produce valid SQS FIFO with self-define lambda role without DLQ CF template items 1`] = `
+Object {
+  "Resources": Object {
+    "LambdaRole": Object {
+      "Properties": Object {
+        "Policies": Array [
+          Object {
+            "PolicyDocument": Object {
+              "Statement": Array [
+                Object {
+                  "Action": Array [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": Array [
+                    Object {
+                      "Fn::Sub": "arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:some prefixsome-nameQueue.fifo",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    "Subscribesome-nameTopic": Object {
+      "Properties": Object {
+        "Endpoint": Object {
+          "Fn::GetAtt": Array [
+            "some-nameQueue",
+            "Arn",
+          ],
+        },
+        "FilterPolicy": Object {
+          "pet": Array [
+            "dog",
+            "cat",
+          ],
+        },
+        "Protocol": "sqs",
+        "RawMessageDelivery": true,
+        "TopicArn": "arn:aws:sns:us-east-2:123456789012:MyTopic",
+      },
+      "Type": "AWS::SNS::Subscription",
+    },
+    "Test-functionEventSourceMappingSQSsome-nameQueue": Object {
+      "DependsOn": "LambdaRole",
+      "Properties": Object {
+        "BatchSize": 7,
+        "Enabled": "False",
+        "EventSourceArn": Object {
+          "Fn::GetAtt": Array [
+            "some-nameQueue",
+            "Arn",
+          ],
+        },
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "Test-functionLambdaFunction",
+            "Arn",
+          ],
+        },
+        "MaximumBatchingWindowInSeconds": 99,
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
+    "some-nameQueue": Object {
+      "Properties": Object {
+        "DeduplicationScope": "messageGroup",
+        "FifoQueue": true,
+        "FifoThroughputLimit": "perMessageGroupId",
+        "KmsDataKeyReusePeriodSeconds": 200,
+        "KmsMasterKeyId": "some key",
+        "QueueName": "some prefixsome-nameQueue.fifo",
+        "VisibilityTimeout": 999,
+      },
+      "Type": "AWS::SQS::Queue",
+    },
+    "some-nameQueuePolicy": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Id": "some prefixsome-nameQueue.fifo",
+          "Statement": Array [
+            Object {
+              "Action": "SQS:SendMessage",
+              "Condition": Object {
+                "ArnEquals": Object {
+                  "aws:SourceArn": Array [
+                    "arn:aws:sns:us-east-2:123456789012:MyTopic",
+                  ],
+                },
+              },
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": "*",
+              },
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "some-nameQueue",
+                  "Arn",
+                ],
+              },
+              "Sid": "some prefixsome-nameSid",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": Array [
+          Object {
+            "Ref": "some-nameQueue",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+  },
+}
+`;
+
 exports[`Test Serverless SNS SQS Lambda when all parameters are provided should produce valid SQS FIFO without DLQ CF template items 1`] = `
 Object {
   "Resources": Object {
