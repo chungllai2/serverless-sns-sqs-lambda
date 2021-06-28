@@ -238,7 +238,6 @@ export default class ServerlessSnsSqsLambda {
       func(template, config);
       return template;
     }, template);
-    console.info("template", template);
   }
 
   /**
