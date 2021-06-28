@@ -238,6 +238,7 @@ export default class ServerlessSnsSqsLambda {
       func(template, config);
       return template;
     }, template);
+    console.info("template", template);
   }
 
   /**
@@ -405,7 +406,7 @@ Usage
       isDisableDLQ
     }
   ) {
-    if (!isDisableDLQ) {
+    if (isDisableDLQ !== true) {
       template.Resources[`${name}DeadLetterQueue`] = {
         Type: "AWS::SQS::Queue",
         Properties: {
@@ -477,16 +478,16 @@ Usage
       Type: "AWS::SQS::Queue",
       Properties: {
         QueueName: `${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`,
-        ...(isDisableDLQ
-          ? {}
-          : {
+        ...(isDisableDLQ !== true
+          ? {
               RedrivePolicy: {
                 deadLetterTargetArn: {
                   "Fn::GetAtt": [`${name}DeadLetterQueue`, "Arn"]
                 },
                 maxReceiveCount: maxRetryCount
               }
-            }),
+            }
+          : {}),
         ...(kmsMasterKeyId !== undefined
           ? {
               KmsMasterKeyId: kmsMasterKeyId
@@ -600,6 +601,21 @@ Usage
     template,
     { name, prefix, iamRoleName, isFifoQueue, isDisableDLQ }
   ) {
+    const resource = [
+      {
+        "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix(
+          isFifoQueue
+        )}`
+      }
+    ];
+    if (isDisableDLQ !== true) {
+      resource.push({
+        "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix(
+          isFifoQueue
+        )}`
+      });
+    }
+
     template.Resources[
       iamRoleName
     ].Properties.Policies[0].PolicyDocument.Statement.push({
@@ -609,20 +625,7 @@ Usage
         "sqs:DeleteMessage",
         "sqs:GetQueueAttributes"
       ],
-      Resource: [
-        {
-          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix(
-            isFifoQueue
-          )}`
-        },
-        isDisableDLQ
-          ? {}
-          : {
-              "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix(
-                isFifoQueue
-              )}`
-            }
-      ]
+      Resource: resource
     });
   }
 }
