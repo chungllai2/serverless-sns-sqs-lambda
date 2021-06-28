@@ -78,6 +78,7 @@ functions:
             subscriptionOverride:
               region: ap-southeast-2
 
+# Config SNS, can ommit if not necessary
 resources:
   Resources:
     Topic:
@@ -111,7 +112,7 @@ functions:
           maxRetryCount: 2 # Optional - default value is 5
           kmsMasterKeyId: alias/aws/sqs # optional - default is none (no encryption)
           kmsDataKeyReusePeriodSeconds: 600 # optional - AWS default is 300 seconds
-          fifoQueue: true;                                 # optional - AWS default is false
+          isFifoQueue: true;                                 # optional - AWS default is false
           fifoThroughputLimit: perMessageGroupId;          # optional - value : perQueue || perMessageGroupId
           deduplicationScope: messageGroup;                # optional - value : queue || messageGroup
           deadLetterMessageRetentionPeriodSeconds: 1209600 # optional - AWS default is 345600 secs (4 days)
@@ -141,7 +142,10 @@ functions:
             # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html
             subscriptionOverride:
               region: ap-southeast-2
-
+            iamRoleName: LambdaRole # default is IamRoleLambdaExecution
+            isDisableDLQ: true # optional - default is false
+              
+# Config SNS, can ommit if not necessary
 resources:
   Resources:
     Topic:
