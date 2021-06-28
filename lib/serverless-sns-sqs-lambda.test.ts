@@ -127,7 +127,7 @@ describe("Test Serverless SNS SQS Lambda", () => {
         maxRetryCount: 4,
         kmsMasterKeyId: "some key",
         kmsDataKeyReusePeriodSeconds: 200,
-        fifoQueue: true,
+        isFifoQueue: true,
         fifoThroughputLimit: "perMessageGroupId",
         deduplicationScope: "messageGroup",
         deadLetterMessageRetentionPeriodSeconds: 1209600,
@@ -135,6 +135,38 @@ describe("Test Serverless SNS SQS Lambda", () => {
         visibilityTimeout: 999,
         rawMessageDelivery: true,
         filterPolicy: { pet: ["dog", "cat"] }
+      };
+      const validatedConfig = serverlessSnsSqsLambda.validateConfig(
+        "test-function",
+        "test-stage",
+        testConfig
+      );
+      serverlessSnsSqsLambda.addEventQueue(template, validatedConfig);
+      serverlessSnsSqsLambda.addEventDeadLetterQueue(template, validatedConfig);
+      serverlessSnsSqsLambda.addEventSourceMapping(template, validatedConfig);
+      serverlessSnsSqsLambda.addTopicSubscription(template, validatedConfig);
+      expect(template).toMatchSnapshot();
+    });
+    it("should produce valid SQS FIFO without DLQ CF template items", () => {
+      const template = { Resources: {} };
+      const testConfig = {
+        name: "some-name",
+        topicArn: "arn:aws:sns:us-east-2:123456789012:MyTopic",
+        batchSize: 7,
+        maximumBatchingWindowInSeconds: 99,
+        prefix: "some prefix",
+        maxRetryCount: 4,
+        kmsMasterKeyId: "some key",
+        kmsDataKeyReusePeriodSeconds: 200,
+        isFifoQueue: true,
+        fifoThroughputLimit: "perMessageGroupId",
+        deduplicationScope: "messageGroup",
+        deadLetterMessageRetentionPeriodSeconds: 1209600,
+        enabled: false,
+        visibilityTimeout: 999,
+        rawMessageDelivery: true,
+        filterPolicy: { pet: ["dog", "cat"] },
+        isDisableDLQ: true,
       };
       const validatedConfig = serverlessSnsSqsLambda.validateConfig(
         "test-function",
