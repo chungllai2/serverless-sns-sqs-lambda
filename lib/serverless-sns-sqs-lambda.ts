@@ -34,7 +34,6 @@ type Config = {
   eventSourceMappingOverride: JsonObject;
   subscriptionOverride: JsonObject;
   iamRoleName: string;
-  fifoSuffix: string; // should not be here
   isDisableDLQ: boolean;
 };
 
@@ -54,6 +53,14 @@ const parseIntOr = (intString, defaultInt) => {
     return defaultInt;
   }
 };
+
+/**
+ * Determine the suffix by isFifoQueue Config
+ * 
+ * @param {isFifoQueue} boolean 
+ */
+const fifoSuffix = (isFifoQueue) => isFifoQueue === true ? ".fifo": "";
+
 
 /**
  * Converts a string from camelCase to PascalCase. Basically, it just
@@ -326,7 +333,6 @@ Usage
       eventSourceMappingOverride: config.eventSourceMappingOverride ?? {},
       subscriptionOverride: config.subscriptionOverride ?? {},
       iamRoleName: config.iamRoleName ?? "IamRoleLambdaExecution",
-      fifoSuffix: config.isFifoQueue ? ".fifo" : "",
       isDisableDLQ: config.isDisableDLQ !== undefined ? config.isDisableDLQ: false,
     };
   }
@@ -392,7 +398,6 @@ Usage
       deduplicationScope,
       deadLetterMessageRetentionPeriodSeconds,
       deadLetterQueueOverride,
-      fifoSuffix,
       isDisableDLQ
     }
   ) {
@@ -400,7 +405,7 @@ Usage
       template.Resources[`${name}DeadLetterQueue`] = {
         Type: "AWS::SQS::Queue",
         Properties: {
-          QueueName: `${prefix}${name}DeadLetterQueue${fifoSuffix}`,
+          QueueName: `${prefix}${name}DeadLetterQueue${fifoSuffix(isFifoQueue)}`,
           ...(kmsMasterKeyId !== undefined
             ? {
                 KmsMasterKeyId: kmsMasterKeyId
@@ -459,14 +464,13 @@ Usage
       deduplicationScope,
       visibilityTimeout,
       mainQueueOverride,
-      fifoSuffix,
       isDisableDLQ,
     }: Config
   ) {
     template.Resources[`${name}Queue`] = {
       Type: "AWS::SQS::Queue",
       Properties: {
-        QueueName: `${prefix}${name}Queue${fifoSuffix}`,
+        QueueName: `${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`,
         ...(!!isDisableDLQ
           ? {}
           : {RedrivePolicy: {
@@ -515,19 +519,19 @@ Usage
    * Add a policy allowing the queue to subscribe to the SNS topic.
    *
    * @param {object} template the template which gets mutated
-   * @param {{name, prefix, topicArn}} config including name of the queue, the
+   * @param {{name, prefix, topicArn, isFifoQueue}} config including name of the queue, the
    *  resource prefix and the arn of the topic
    */
   addEventQueuePolicy(
     template,
-    { name, prefix, topicArn, fifoSuffix }: Config
+    { name, prefix, topicArn, isFifoQueue }: Config
   ) {
     template.Resources[`${name}QueuePolicy`] = {
       Type: "AWS::SQS::QueuePolicy",
       Properties: {
         PolicyDocument: {
           Version: "2012-10-17",
-          Id: `${prefix}${name}Queue${fifoSuffix}`,
+          Id: `${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`,
           Statement: [
             {
               Sid: `${prefix}${name}Sid`,
@@ -548,7 +552,7 @@ Usage
    * Subscribe the newly created queue to the desired topic.
    *
    * @param {object} template the template which gets mutated
-   * @param {{name, topicArn, filterPolicy}} config including name of the queue,
+   * @param {{name, topicArn, filterPolicy, rawMessageDelivery, subscriptionOverride}} config including name of the queue,
    *  the arn of the topic and the filter policy for the subscription
    */
   addTopicSubscription(
@@ -582,9 +586,9 @@ Usage
    * Add permissions so that the SQS handler can access the queue.
    *
    * @param {object} template the template which gets mutated
-   * @param {{name, prefix}} config the name of the queue the lambda is subscribed to
+   * @param {{name, prefix, iamRoleName, isFifoQueue, isDisableDLQ}} config the name of the queue the lambda is subscribed to
    */
-  addLambdaSqsPermissions(template, { name, prefix, iamRoleName, fifoSuffix, isDisableDLQ }) {
+  addLambdaSqsPermissions(template, { name, prefix, iamRoleName, isFifoQueue, isDisableDLQ }) {
     template.Resources[
       iamRoleName
     ].Properties.Policies[0].PolicyDocument.Statement.push({
@@ -596,10 +600,10 @@ Usage
       ],
       Resource: [
         {
-          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix}`
+          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`
         },
         (!!isDisableDLQ ? {} :{
-          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix}`
+          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix(isFifoQueue)}`
         })
       ]
     });
