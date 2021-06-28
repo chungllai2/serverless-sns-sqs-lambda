@@ -12,7 +12,7 @@ node_modules
 .history
 
 # tsc output
-dist
+# dist
 
 #misc
 yarn-error.log
