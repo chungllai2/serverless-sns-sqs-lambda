@@ -244,7 +244,7 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
      */
     ServerlessSnsSqsLambda.prototype.addEventDeadLetterQueue = function (template, _a) {
         var name = _a.name, prefix = _a.prefix, kmsMasterKeyId = _a.kmsMasterKeyId, kmsDataKeyReusePeriodSeconds = _a.kmsDataKeyReusePeriodSeconds, isFifoQueue = _a.isFifoQueue, fifoThroughputLimit = _a.fifoThroughputLimit, deduplicationScope = _a.deduplicationScope, deadLetterMessageRetentionPeriodSeconds = _a.deadLetterMessageRetentionPeriodSeconds, deadLetterQueueOverride = _a.deadLetterQueueOverride, isDisableDLQ = _a.isDisableDLQ;
-        if (!isDisableDLQ) {
+        if (isDisableDLQ !== true) {
             template.Resources[name + "DeadLetterQueue"] = {
                 Type: "AWS::SQS::Queue",
                 Properties: __assign(__assign(__assign(__assign(__assign({ QueueName: "" + prefix + name + "DeadLetterQueue" + fifoSuffix(isFifoQueue) }, (kmsMasterKeyId !== undefined
@@ -284,16 +284,16 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
         var name = _a.name, prefix = _a.prefix, maxRetryCount = _a.maxRetryCount, kmsMasterKeyId = _a.kmsMasterKeyId, kmsDataKeyReusePeriodSeconds = _a.kmsDataKeyReusePeriodSeconds, isFifoQueue = _a.isFifoQueue, fifoThroughputLimit = _a.fifoThroughputLimit, deduplicationScope = _a.deduplicationScope, visibilityTimeout = _a.visibilityTimeout, mainQueueOverride = _a.mainQueueOverride, isDisableDLQ = _a.isDisableDLQ;
         template.Resources[name + "Queue"] = {
             Type: "AWS::SQS::Queue",
-            Properties: __assign(__assign(__assign(__assign(__assign(__assign({ QueueName: "" + prefix + name + "Queue" + fifoSuffix(isFifoQueue) }, (isDisableDLQ
-                ? {}
-                : {
+            Properties: __assign(__assign(__assign(__assign(__assign(__assign({ QueueName: "" + prefix + name + "Queue" + fifoSuffix(isFifoQueue) }, (isDisableDLQ !== true
+                ? {
                     RedrivePolicy: {
                         deadLetterTargetArn: {
                             "Fn::GetAtt": [name + "DeadLetterQueue", "Arn"]
                         },
                         maxReceiveCount: maxRetryCount
                     }
-                })), (kmsMasterKeyId !== undefined
+                }
+                : {})), (kmsMasterKeyId !== undefined
                 ? {
                     KmsMasterKeyId: kmsMasterKeyId
                 }
@@ -373,6 +373,16 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
      */
     ServerlessSnsSqsLambda.prototype.addLambdaSqsPermissions = function (template, _a) {
         var name = _a.name, prefix = _a.prefix, iamRoleName = _a.iamRoleName, isFifoQueue = _a.isFifoQueue, isDisableDLQ = _a.isDisableDLQ;
+        var resource = [
+            {
+                "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:" + prefix + name + "Queue" + fifoSuffix(isFifoQueue)
+            }
+        ];
+        if (isDisableDLQ !== true) {
+            resource.push({
+                "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:" + prefix + name + "DeadLetterQueue" + fifoSuffix(isFifoQueue)
+            });
+        }
         template.Resources[iamRoleName].Properties.Policies[0].PolicyDocument.Statement.push({
             Effect: "Allow",
             Action: [
@@ -380,16 +390,7 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
                 "sqs:DeleteMessage",
                 "sqs:GetQueueAttributes"
             ],
-            Resource: [
-                {
-                    "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:" + prefix + name + "Queue" + fifoSuffix(isFifoQueue)
-                },
-                isDisableDLQ
-                    ? {}
-                    : {
-                        "Fn::Sub": "arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:" + prefix + name + "DeadLetterQueue" + fifoSuffix(isFifoQueue)
-                    }
-            ]
+            Resource: resource
         });
     };
     return ServerlessSnsSqsLambda;
