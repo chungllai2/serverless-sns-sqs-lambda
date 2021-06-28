@@ -19,7 +19,7 @@ type Config = {
   kmsMasterKeyId: string;
   kmsDataKeyReusePeriodSeconds: number;
   // **** FIFO setting **** //
-  fifoQueue: boolean;
+  isFifoQueue: boolean;
   fifoThroughputLimit: string; // perQueue ||  perMessageGroupId
   deduplicationScope: string; // queue || messageGroup, just not setting here
   // **** FIFO setting **** //
@@ -33,6 +33,8 @@ type Config = {
   deadLetterQueueOverride: JsonObject;
   eventSourceMappingOverride: JsonObject;
   subscriptionOverride: JsonObject;
+  iamRoleName: string;
+  isDisableDLQ: boolean;
 };
 
 /**
@@ -51,6 +53,14 @@ const parseIntOr = (intString, defaultInt) => {
     return defaultInt;
   }
 };
+
+/**
+ * Determine the suffix by isFifoQueue Config
+ * 
+ * @param {isFifoQueue} boolean 
+ */
+const fifoSuffix = (isFifoQueue) => isFifoQueue === true ? ".fifo": "";
+
 
 /**
  * Converts a string from camelCase to PascalCase. Basically, it just
@@ -89,7 +99,7 @@ const pascalCaseAllKeys = (jsonObject: JsonObject): JsonObject =>
  *             maxRetryCount: 2
  *             kmsMasterKeyId: alias/aws/sqs
  *             kmsDataKeyReusePeriodSeconds: 600
- *             fifoQueue: true,
+ *             isFifoQueue: true,
  *             fifoThroughputLimit: perMessageGroupId,
  *             deduplicationScope: messageGroup,
  *             deadLetterMessageRetentionPeriodSeconds: 1209600
@@ -150,7 +160,7 @@ export default class ServerlessSnsSqsLambda {
           minimum: 60,
           maximum: 1209600
         },
-        fifoQueue: { type: "boolean" },
+        isFifoQueue: { type: "boolean" },
         fifoThroughputLimit: { type: "string" },
         deduplicationScope: { type: "string" },
         rawMessageDelivery: { type: "boolean" },
@@ -261,13 +271,15 @@ Usage
             batchWindow: 10                                  # optional - default is 0 (no batch window)
             kmsMasterKeyId: alias/aws/sqs                    # optional - default is none (no encryption)
             kmsDataKeyReusePeriodSeconds: 600                # optional - AWS default is 300 seconds
-            fifoQueue: true;                                 # optional - AWS default is false
+            isFifoQueue: true;                                 # optional - AWS default is false
             fifoThroughputLimit: perMessageGroupId;          # optional - value : perQueue || perMessageGroupId
             deduplicationScope: messageGroup;                # optional - value : queue || messageGroup
             deadLetterMessageRetentionPeriodSeconds: 1209600 # optional - AWS default is 345600 secs (4 days)
             enabled: true                                    # optional - AWS default is true
             visibilityTimeout: 30                            # optional - AWS default is 30 seconds
             rawMessageDelivery: false                        # optional - default is false
+            iamRoleName: LambdaRole                          # optional - default is IamRoleLambdaExecution
+            isDisableDLQ: true                               # optional - default is false
             filterPolicy:
               pet:
                 - dog
@@ -305,7 +317,7 @@ Usage
       maxRetryCount: parseIntOr(config.maxRetryCount, 5),
       kmsMasterKeyId: config.kmsMasterKeyId,
       kmsDataKeyReusePeriodSeconds: config.kmsDataKeyReusePeriodSeconds,
-      fifoQueue: config.fifoQueue,
+      isFifoQueue: config.isFifoQueue,
       fifoThroughputLimit: config.fifoThroughputLimit,
       deduplicationScope: config.deduplicationScope,
       deadLetterMessageRetentionPeriodSeconds:
@@ -319,7 +331,9 @@ Usage
       mainQueueOverride: config.mainQueueOverride ?? {},
       deadLetterQueueOverride: config.deadLetterQueueOverride ?? {},
       eventSourceMappingOverride: config.eventSourceMappingOverride ?? {},
-      subscriptionOverride: config.subscriptionOverride ?? {}
+      subscriptionOverride: config.subscriptionOverride ?? {},
+      iamRoleName: config.iamRoleName ?? "IamRoleLambdaExecution",
+      isDisableDLQ: config.isDisableDLQ !== undefined ? config.isDisableDLQ: false,
     };
   }
 
@@ -339,13 +353,14 @@ Usage
       batchSize,
       maximumBatchingWindowInSeconds,
       enabled,
-      eventSourceMappingOverride
+      eventSourceMappingOverride,
+      iamRoleName
     }: Config
   ) {
     const enabledWithDefault = enabled !== undefined ? enabled : true;
     template.Resources[`${funcName}EventSourceMappingSQS${name}Queue`] = {
       Type: "AWS::Lambda::EventSourceMapping",
-      DependsOn: "IamRoleLambdaExecution",
+      DependsOn: iamRoleName,
       Properties: {
         BatchSize: batchSize,
         MaximumBatchingWindowInSeconds:
@@ -368,7 +383,7 @@ Usage
    * @see https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
    *
    * @param {object} template the template which gets mutated
-   * @param {{name, prefix, kmsMasterKeyId, kmsDataKeyReusePeriodSeconds, fifoQueue, fifoThroughputLimit, deduplicationScope, deadLetterMessageRetentionPeriodSeconds }} config including name of the queue
+   * @param {{name, prefix, kmsMasterKeyId, kmsDataKeyReusePeriodSeconds, isFifoQueue, fifoThroughputLimit, deduplicationScope, deadLetterMessageRetentionPeriodSeconds, isDisableDLQ }} config including name of the queue
    *  and the resource prefix
    */
   addEventDeadLetterQueue(
@@ -378,50 +393,54 @@ Usage
       prefix,
       kmsMasterKeyId,
       kmsDataKeyReusePeriodSeconds,
-      fifoQueue,
+      isFifoQueue,
       fifoThroughputLimit,
       deduplicationScope,
       deadLetterMessageRetentionPeriodSeconds,
-      deadLetterQueueOverride
+      deadLetterQueueOverride,
+      isDisableDLQ
     }
   ) {
-    template.Resources[`${name}DeadLetterQueue`] = {
-      Type: "AWS::SQS::Queue",
-      Properties: {
-        QueueName: `${prefix}${name}DeadLetterQueue`,
-        ...(kmsMasterKeyId !== undefined
-          ? {
-              KmsMasterKeyId: kmsMasterKeyId
-            }
-          : {}),
-        ...(kmsDataKeyReusePeriodSeconds !== undefined
-          ? {
-              KmsDataKeyReusePeriodSeconds: kmsDataKeyReusePeriodSeconds
-            }
-          : {}),
-        ...(fifoQueue !== undefined
-          ? {
-              FifoQueue: fifoQueue
-            }
-          : {}),
-        ...(fifoThroughputLimit !== undefined
-          ? {
-              FifoThroughputLimit: fifoThroughputLimit
-            }
-          : {}),
-        ...(deduplicationScope !== undefined
-          ? {
-              DeduplicationScope: deduplicationScope
-            }
-          : {}),
-        ...(deadLetterMessageRetentionPeriodSeconds !== undefined
-          ? {
-              MessageRetentionPeriod: deadLetterMessageRetentionPeriodSeconds
-            }
-          : {}),
-        ...pascalCaseAllKeys(deadLetterQueueOverride)
-      }
-    };
+    if(!isDisableDLQ){
+      template.Resources[`${name}DeadLetterQueue`] = {
+        Type: "AWS::SQS::Queue",
+        Properties: {
+          QueueName: `${prefix}${name}DeadLetterQueue${fifoSuffix(isFifoQueue)}`,
+          ...(kmsMasterKeyId !== undefined
+            ? {
+                KmsMasterKeyId: kmsMasterKeyId
+              }
+            : {}),
+          ...(kmsDataKeyReusePeriodSeconds !== undefined
+            ? {
+                KmsDataKeyReusePeriodSeconds: kmsDataKeyReusePeriodSeconds
+              }
+            : {}),
+          ...(isFifoQueue !== undefined
+            ? {
+                FifoQueue: isFifoQueue,
+                ...(fifoThroughputLimit !== undefined
+                  ? {
+                      FifoThroughputLimit: fifoThroughputLimit
+                    }
+                  : {}),
+                ...(deduplicationScope !== undefined
+                  ? {
+                      DeduplicationScope: deduplicationScope
+                    }
+                  : {})
+              }
+            : {}),
+  
+          ...(deadLetterMessageRetentionPeriodSeconds !== undefined
+            ? {
+                MessageRetentionPeriod: deadLetterMessageRetentionPeriodSeconds
+              }
+            : {}),
+          ...pascalCaseAllKeys(deadLetterQueueOverride)
+        }
+      };
+    }
   }
 
   /**
@@ -429,7 +448,7 @@ Usage
    * from SNS as they arrive, holding them for processing.
    *
    * @param {object} template the template which gets mutated
-   * @param {{name, prefix, maxRetryCount, kmsMasterKeyId, kmsDataKeyReusePeriodSeconds, fifoQueue, fifoThroughputLimit, deduplicationScope, visibilityTimeout}} config including name of the queue,
+   * @param {{name, prefix, maxRetryCount, kmsMasterKeyId, kmsDataKeyReusePeriodSeconds, isFifoQueue, fifoThroughputLimit, deduplicationScope, visibilityTimeout}} config including name of the queue,
    *  the resource prefix and the max retry count for message handler failures.
    */
   addEventQueue(
@@ -440,23 +459,26 @@ Usage
       maxRetryCount,
       kmsMasterKeyId,
       kmsDataKeyReusePeriodSeconds,
-      fifoQueue,
+      isFifoQueue,
       fifoThroughputLimit,
       deduplicationScope,
       visibilityTimeout,
-      mainQueueOverride
+      mainQueueOverride,
+      isDisableDLQ,
     }: Config
   ) {
     template.Resources[`${name}Queue`] = {
       Type: "AWS::SQS::Queue",
       Properties: {
-        QueueName: `${prefix}${name}Queue`,
-        RedrivePolicy: {
+        QueueName: `${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`,
+        ...(isDisableDLQ
+          ? {}
+          : {RedrivePolicy: {
           deadLetterTargetArn: {
             "Fn::GetAtt": [`${name}DeadLetterQueue`, "Arn"]
           },
           maxReceiveCount: maxRetryCount
-        },
+        }}),
         ...(kmsMasterKeyId !== undefined
           ? {
               KmsMasterKeyId: kmsMasterKeyId
@@ -467,21 +489,22 @@ Usage
               KmsDataKeyReusePeriodSeconds: kmsDataKeyReusePeriodSeconds
             }
           : {}),
-        ...(fifoQueue !== undefined
+        ...(isFifoQueue !== undefined
           ? {
-              FifoQueue: fifoQueue
+              FifoQueue: isFifoQueue,
+              ...(fifoThroughputLimit !== undefined
+                ? {
+                    FifoThroughputLimit: fifoThroughputLimit
+                  }
+                : {}),
+              ...(deduplicationScope !== undefined
+                ? {
+                    DeduplicationScope: deduplicationScope
+                  }
+                : {})
             }
           : {}),
-        ...(fifoThroughputLimit !== undefined
-          ? {
-              FifoThroughputLimit: fifoThroughputLimit
-            }
-          : {}),
-        ...(deduplicationScope !== undefined
-          ? {
-              DeduplicationScope: deduplicationScope
-            }
-          : {}),
+
         ...(visibilityTimeout !== undefined
           ? {
               VisibilityTimeout: visibilityTimeout
@@ -496,16 +519,19 @@ Usage
    * Add a policy allowing the queue to subscribe to the SNS topic.
    *
    * @param {object} template the template which gets mutated
-   * @param {{name, prefix, topicArn}} config including name of the queue, the
+   * @param {{name, prefix, topicArn, isFifoQueue}} config including name of the queue, the
    *  resource prefix and the arn of the topic
    */
-  addEventQueuePolicy(template, { name, prefix, topicArn }: Config) {
+  addEventQueuePolicy(
+    template,
+    { name, prefix, topicArn, isFifoQueue }: Config
+  ) {
     template.Resources[`${name}QueuePolicy`] = {
       Type: "AWS::SQS::QueuePolicy",
       Properties: {
         PolicyDocument: {
           Version: "2012-10-17",
-          Id: `${prefix}${name}Queue`,
+          Id: `${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`,
           Statement: [
             {
               Sid: `${prefix}${name}Sid`,
@@ -526,7 +552,7 @@ Usage
    * Subscribe the newly created queue to the desired topic.
    *
    * @param {object} template the template which gets mutated
-   * @param {{name, topicArn, filterPolicy}} config including name of the queue,
+   * @param {{name, topicArn, filterPolicy, rawMessageDelivery, subscriptionOverride}} config including name of the queue,
    *  the arn of the topic and the filter policy for the subscription
    */
   addTopicSubscription(
@@ -560,26 +586,26 @@ Usage
    * Add permissions so that the SQS handler can access the queue.
    *
    * @param {object} template the template which gets mutated
-   * @param {{name, prefix}} config the name of the queue the lambda is subscribed to
+   * @param {{name, prefix, iamRoleName, isFifoQueue, isDisableDLQ}} config the name of the queue the lambda is subscribed to
    */
-  addLambdaSqsPermissions(template, { name, prefix }) {
-    template.Resources.IamRoleLambdaExecution.Properties.Policies[0].PolicyDocument.Statement.push(
-      {
-        Effect: "Allow",
-        Action: [
-          "sqs:ReceiveMessage",
-          "sqs:DeleteMessage",
-          "sqs:GetQueueAttributes"
-        ],
-        Resource: [
-          {
-            "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue`
-          },
-          {
-            "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue`
-          }
-        ]
-      }
-    );
+  addLambdaSqsPermissions(template, { name, prefix, iamRoleName, isFifoQueue, isDisableDLQ }) {
+    template.Resources[
+      iamRoleName
+    ].Properties.Policies[0].PolicyDocument.Statement.push({
+      Effect: "Allow",
+      Action: [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes"
+      ],
+      Resource: [
+        {
+          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`
+        },
+        (isDisableDLQ ? {} :{
+          "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix(isFifoQueue)}`
+        })
+      ]
+    });
   }
 }
