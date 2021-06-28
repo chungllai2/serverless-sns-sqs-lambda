@@ -471,7 +471,7 @@ Usage
       Type: "AWS::SQS::Queue",
       Properties: {
         QueueName: `${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`,
-        ...(!!isDisableDLQ
+        ...(isDisableDLQ
           ? {}
           : {RedrivePolicy: {
           deadLetterTargetArn: {
@@ -602,7 +602,7 @@ Usage
         {
           "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}Queue${fifoSuffix(isFifoQueue)}`
         },
-        (!!isDisableDLQ ? {} :{
+        (isDisableDLQ ? {} :{
           "Fn::Sub": `arn:\${AWS::Partition}:sqs:\${AWS::Region}:\${AWS::AccountId}:${prefix}${name}DeadLetterQueue${fifoSuffix(isFifoQueue)}`
         })
       ]
