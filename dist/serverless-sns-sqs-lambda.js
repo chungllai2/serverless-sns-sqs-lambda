@@ -71,6 +71,7 @@ var pascalCaseAllKeys = function (jsonObject) {
  *             isFifoQueue: true,
  *             fifoThroughputLimit: perMessageGroupId,
  *             deduplicationScope: messageGroup,
+ *             contentBasedDeduplication: true,
  *             iamRoleName: LambdaRole,
  *             isDisableDLQ: true,
  *             deadLetterMessageRetentionPeriodSeconds: 1209600
@@ -126,6 +127,7 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
                 isFifoQueue: { type: "boolean" },
                 fifoThroughputLimit: { type: "string" },
                 deduplicationScope: { type: "string" },
+                contentBasedDeduplication: { type: "boolean" },
                 rawMessageDelivery: { type: "boolean" },
                 enabled: { type: "boolean" },
                 filterPolicy: { type: "object" },
@@ -204,11 +206,14 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
      */
     ServerlessSnsSqsLambda.prototype.validateConfig = function (funcName, stage, config) {
         var _a, _b, _c, _d, _e;
-        if (!config.topicArn || !config.name) {
-            throw new Error("Error:\nWhen creating an snsSqs handler, you must define the name and topicArn.\nIn function [" + funcName + "]:\n- name was [" + config.name + "]\n- topicArn was [" + config.topicArn + "].\n\nUsage\n-----\n\n  functions:\n    processEvent:\n      handler: handler.handler\n      events:\n        - snsSqs:\n            name: Event                                      # required\n            topicArn: !Ref TopicArn                          # required\n            prefix: some-prefix                              # optional - default is `${this.serviceName}-${stage}-${funcNamePascalCase}`\n            maxRetryCount: 2                                 # optional - default is 5\n            batchSize: 1                                     # optional - default is 10\n            batchWindow: 10                                  # optional - default is 0 (no batch window)\n            kmsMasterKeyId: alias/aws/sqs                    # optional - default is none (no encryption)\n            kmsDataKeyReusePeriodSeconds: 600                # optional - AWS default is 300 seconds\n            isFifoQueue: true;                                 # optional - AWS default is false\n            fifoThroughputLimit: perMessageGroupId;          # optional - value : perQueue || perMessageGroupId\n            deduplicationScope: messageGroup;                # optional - value : queue || messageGroup\n            deadLetterMessageRetentionPeriodSeconds: 1209600 # optional - AWS default is 345600 secs (4 days)\n            enabled: true                                    # optional - AWS default is true\n            visibilityTimeout: 30                            # optional - AWS default is 30 seconds\n            rawMessageDelivery: false                        # optional - default is false\n            iamRoleName: LambdaRole                          # optional - default is IamRoleLambdaExecution\n            isDisableDLQ: true                               # optional - default is false\n            filterPolicy:\n              pet:\n                - dog\n                - cat\n\n            # Overrides for generated CloudFormation templates\n            # Mirrors the CloudFormation docs but uses camel case instead of title case\n            #\n            #\n            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html\n            mainQueueOverride:\n              maximumMessageSize: 1024\n              ...\n            deadLetterQueueOverride:\n              maximumMessageSize: 1024\n              ...\n            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-eventsourcemapping.html\n            eventSourceMappingOverride:\n              bisectBatchOnFunctionError: true\n            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html\n            subscriptionOverride:\n              rawMessageDelivery: true\n\n");
+        if (!config.topicArn ||
+            !config.name ||
+            (config.isFifoQueue === true &&
+                config.contentBasedDeduplication === undefined)) {
+            throw new Error("Error:\nWhen creating an snsSqs handler, you must define the name and topicArn.\nIn function [" + funcName + "]:\n- name was [" + config.name + "]\n- topicArn was [" + config.topicArn + "].\n\nUsage\n-----\n\n  functions:\n    processEvent:\n      handler: handler.handler\n      events:\n        - snsSqs:\n            name: Event                                      # required\n            topicArn: !Ref TopicArn                          # required\n            prefix: some-prefix                              # optional - default is `${this.serviceName}-${stage}-${funcNamePascalCase}`\n            maxRetryCount: 2                                 # optional - default is 5\n            batchSize: 1                                     # optional - default is 10\n            batchWindow: 10                                  # optional - default is 0 (no batch window)\n            kmsMasterKeyId: alias/aws/sqs                    # optional - default is none (no encryption)\n            kmsDataKeyReusePeriodSeconds: 600                # optional - AWS default is 300 seconds\n            isFifoQueue: true;                               # optional - AWS default is false\n            fifoThroughputLimit: perMessageGroupId;          # optional - value : perQueue || perMessageGroupId\n            deduplicationScope: messageGroup;                # optional - value : queue || messageGroup\n            contentBasedDeduplication: true                  # optional - value : boolean, in fifo, either contentBasedDeduplication:true or provide MessageDeduplicationId \n            deadLetterMessageRetentionPeriodSeconds: 1209600 # optional - AWS default is 345600 secs (4 days)\n            enabled: true                                    # optional - AWS default is true\n            visibilityTimeout: 30                            # optional - AWS default is 30 seconds\n            rawMessageDelivery: false                        # optional - default is false\n            iamRoleName: LambdaRole                          # optional - default is IamRoleLambdaExecution\n            isDisableDLQ: true                               # optional - default is false\n            filterPolicy:\n              pet:\n                - dog\n                - cat\n\n            # Overrides for generated CloudFormation templates\n            # Mirrors the CloudFormation docs but uses camel case instead of title case\n            #\n            #\n            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-sqs-queues.html\n            mainQueueOverride:\n              maximumMessageSize: 1024\n              ...\n            deadLetterQueueOverride:\n              maximumMessageSize: 1024\n              ...\n            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-lambda-eventsourcemapping.html\n            eventSourceMappingOverride:\n              bisectBatchOnFunctionError: true\n            # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-sns-subscription.html\n            subscriptionOverride:\n              rawMessageDelivery: true\n\n");
         }
         var funcNamePascalCase = pascalCase(funcName);
-        return __assign(__assign({}, config), { name: config.name, funcName: funcNamePascalCase, prefix: config.prefix || this.serviceName + "-" + stage + "-" + funcNamePascalCase, batchSize: parseIntOr(config.batchSize, 10), maxRetryCount: parseIntOr(config.maxRetryCount, 5), kmsMasterKeyId: config.kmsMasterKeyId, kmsDataKeyReusePeriodSeconds: config.kmsDataKeyReusePeriodSeconds, isFifoQueue: config.isFifoQueue, fifoThroughputLimit: config.fifoThroughputLimit, deduplicationScope: config.deduplicationScope, deadLetterMessageRetentionPeriodSeconds: config.deadLetterMessageRetentionPeriodSeconds, enabled: config.enabled, visibilityTimeout: config.visibilityTimeout, rawMessageDelivery: config.rawMessageDelivery !== undefined
+        return __assign(__assign({}, config), { name: config.name, funcName: funcNamePascalCase, prefix: config.prefix || this.serviceName + "-" + stage + "-" + funcNamePascalCase, batchSize: parseIntOr(config.batchSize, 10), maxRetryCount: parseIntOr(config.maxRetryCount, 5), kmsMasterKeyId: config.kmsMasterKeyId, kmsDataKeyReusePeriodSeconds: config.kmsDataKeyReusePeriodSeconds, isFifoQueue: config.isFifoQueue, fifoThroughputLimit: config.fifoThroughputLimit, deduplicationScope: config.deduplicationScope, contentBasedDeduplication: config.contentBasedDeduplication, deadLetterMessageRetentionPeriodSeconds: config.deadLetterMessageRetentionPeriodSeconds, enabled: config.enabled, visibilityTimeout: config.visibilityTimeout, rawMessageDelivery: config.rawMessageDelivery !== undefined
                 ? config.rawMessageDelivery
                 : false, mainQueueOverride: (_a = config.mainQueueOverride) !== null && _a !== void 0 ? _a : {}, deadLetterQueueOverride: (_b = config.deadLetterQueueOverride) !== null && _b !== void 0 ? _b : {}, eventSourceMappingOverride: (_c = config.eventSourceMappingOverride) !== null && _c !== void 0 ? _c : {}, subscriptionOverride: (_d = config.subscriptionOverride) !== null && _d !== void 0 ? _d : {}, iamRoleName: (_e = config.iamRoleName) !== null && _e !== void 0 ? _e : "IamRoleLambdaExecution", isDisableDLQ: config.isDisableDLQ !== undefined ? config.isDisableDLQ : false });
     };
@@ -243,7 +248,7 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
      *  and the resource prefix
      */
     ServerlessSnsSqsLambda.prototype.addEventDeadLetterQueue = function (template, _a) {
-        var name = _a.name, prefix = _a.prefix, kmsMasterKeyId = _a.kmsMasterKeyId, kmsDataKeyReusePeriodSeconds = _a.kmsDataKeyReusePeriodSeconds, isFifoQueue = _a.isFifoQueue, fifoThroughputLimit = _a.fifoThroughputLimit, deduplicationScope = _a.deduplicationScope, deadLetterMessageRetentionPeriodSeconds = _a.deadLetterMessageRetentionPeriodSeconds, deadLetterQueueOverride = _a.deadLetterQueueOverride, isDisableDLQ = _a.isDisableDLQ;
+        var name = _a.name, prefix = _a.prefix, kmsMasterKeyId = _a.kmsMasterKeyId, kmsDataKeyReusePeriodSeconds = _a.kmsDataKeyReusePeriodSeconds, isFifoQueue = _a.isFifoQueue, fifoThroughputLimit = _a.fifoThroughputLimit, deduplicationScope = _a.deduplicationScope, contentBasedDeduplication = _a.contentBasedDeduplication, deadLetterMessageRetentionPeriodSeconds = _a.deadLetterMessageRetentionPeriodSeconds, deadLetterQueueOverride = _a.deadLetterQueueOverride, isDisableDLQ = _a.isDisableDLQ;
         if (isDisableDLQ !== true) {
             template.Resources[name + "DeadLetterQueue"] = {
                 Type: "AWS::SQS::Queue",
@@ -256,7 +261,7 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
                         KmsDataKeyReusePeriodSeconds: kmsDataKeyReusePeriodSeconds
                     }
                     : {})), (isFifoQueue !== undefined
-                    ? __assign(__assign({ FifoQueue: isFifoQueue }, (fifoThroughputLimit !== undefined
+                    ? __assign(__assign(__assign({ FifoQueue: isFifoQueue }, (fifoThroughputLimit !== undefined
                         ? {
                             FifoThroughputLimit: fifoThroughputLimit
                         }
@@ -264,7 +269,14 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
                         ? {
                             DeduplicationScope: deduplicationScope
                         }
-                        : {})) : {})), (deadLetterMessageRetentionPeriodSeconds !== undefined
+                        : {})), (contentBasedDeduplication !== undefined
+                        ? {
+                            ContentBasedDeduplication: contentBasedDeduplication
+                        }
+                        : {
+                        // Should throw error instead
+                        // ContentBasedDeduplication: true // to avoid error, will be overwritten by MessageDeduplicationId
+                        })) : {})), (deadLetterMessageRetentionPeriodSeconds !== undefined
                     ? {
                         MessageRetentionPeriod: deadLetterMessageRetentionPeriodSeconds
                     }
@@ -281,7 +293,7 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
      *  the resource prefix and the max retry count for message handler failures.
      */
     ServerlessSnsSqsLambda.prototype.addEventQueue = function (template, _a) {
-        var name = _a.name, prefix = _a.prefix, maxRetryCount = _a.maxRetryCount, kmsMasterKeyId = _a.kmsMasterKeyId, kmsDataKeyReusePeriodSeconds = _a.kmsDataKeyReusePeriodSeconds, isFifoQueue = _a.isFifoQueue, fifoThroughputLimit = _a.fifoThroughputLimit, deduplicationScope = _a.deduplicationScope, visibilityTimeout = _a.visibilityTimeout, mainQueueOverride = _a.mainQueueOverride, isDisableDLQ = _a.isDisableDLQ;
+        var name = _a.name, prefix = _a.prefix, maxRetryCount = _a.maxRetryCount, kmsMasterKeyId = _a.kmsMasterKeyId, kmsDataKeyReusePeriodSeconds = _a.kmsDataKeyReusePeriodSeconds, isFifoQueue = _a.isFifoQueue, fifoThroughputLimit = _a.fifoThroughputLimit, deduplicationScope = _a.deduplicationScope, contentBasedDeduplication = _a.contentBasedDeduplication, visibilityTimeout = _a.visibilityTimeout, mainQueueOverride = _a.mainQueueOverride, isDisableDLQ = _a.isDisableDLQ;
         template.Resources[name + "Queue"] = {
             Type: "AWS::SQS::Queue",
             Properties: __assign(__assign(__assign(__assign(__assign(__assign({ QueueName: "" + prefix + name + "Queue" + fifoSuffix(isFifoQueue) }, (isDisableDLQ !== true
@@ -302,7 +314,7 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
                     KmsDataKeyReusePeriodSeconds: kmsDataKeyReusePeriodSeconds
                 }
                 : {})), (isFifoQueue !== undefined
-                ? __assign(__assign({ FifoQueue: isFifoQueue }, (fifoThroughputLimit !== undefined
+                ? __assign(__assign(__assign({ FifoQueue: isFifoQueue }, (fifoThroughputLimit !== undefined
                     ? {
                         FifoThroughputLimit: fifoThroughputLimit
                     }
@@ -310,7 +322,14 @@ var ServerlessSnsSqsLambda = /** @class */ (function () {
                     ? {
                         DeduplicationScope: deduplicationScope
                     }
-                    : {})) : {})), (visibilityTimeout !== undefined
+                    : {})), (contentBasedDeduplication !== undefined
+                    ? {
+                        ContentBasedDeduplication: contentBasedDeduplication
+                    }
+                    : {
+                    // Should throw error instead
+                    // ContentBasedDeduplication: true // to avoid error, will be overwritten by MessageDeduplicationId
+                    })) : {})), (visibilityTimeout !== undefined
                 ? {
                     VisibilityTimeout: visibilityTimeout
                 }

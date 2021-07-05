@@ -22,6 +22,8 @@ type Config = {
   isFifoQueue: boolean;
   fifoThroughputLimit: string; // perQueue ||  perMessageGroupId
   deduplicationScope: string; // queue || messageGroup, just not setting here
+  contentBasedDeduplication: boolean; // If you aren't able to provide a MessageDeduplicationId and you enable ContentBasedDeduplication for your queue, Amazon SQS uses a SHA-256 hash to generate the MessageDeduplicationId using the body of the message (but not the attributes of the message).
+  // @see https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_CreateQueue.html
   // **** FIFO setting **** //
   deadLetterMessageRetentionPeriodSeconds: number;
   enabled: boolean;
@@ -101,6 +103,7 @@ const pascalCaseAllKeys = (jsonObject: JsonObject): JsonObject =>
  *             isFifoQueue: true,
  *             fifoThroughputLimit: perMessageGroupId,
  *             deduplicationScope: messageGroup,
+ *             contentBasedDeduplication: true,
  *             iamRoleName: LambdaRole,
  *             isDisableDLQ: true,
  *             deadLetterMessageRetentionPeriodSeconds: 1209600
@@ -164,6 +167,7 @@ export default class ServerlessSnsSqsLambda {
         isFifoQueue: { type: "boolean" },
         fifoThroughputLimit: { type: "string" },
         deduplicationScope: { type: "string" },
+        contentBasedDeduplication: { type: "boolean" },
         rawMessageDelivery: { type: "boolean" },
         enabled: { type: "boolean" },
         filterPolicy: { type: "object" },
@@ -251,7 +255,12 @@ export default class ServerlessSnsSqsLambda {
    *  portion of the serverless function config
    */
   validateConfig(funcName, stage, config): Config {
-    if (!config.topicArn || !config.name) {
+    if (
+      !config.topicArn ||
+      !config.name ||
+      (config.isFifoQueue === true &&
+        config.contentBasedDeduplication === undefined)
+    ) {
       throw new Error(`Error:
 When creating an snsSqs handler, you must define the name and topicArn.
 In function [${funcName}]:
@@ -274,9 +283,10 @@ Usage
             batchWindow: 10                                  # optional - default is 0 (no batch window)
             kmsMasterKeyId: alias/aws/sqs                    # optional - default is none (no encryption)
             kmsDataKeyReusePeriodSeconds: 600                # optional - AWS default is 300 seconds
-            isFifoQueue: true;                                 # optional - AWS default is false
+            isFifoQueue: true;                               # optional - AWS default is false
             fifoThroughputLimit: perMessageGroupId;          # optional - value : perQueue || perMessageGroupId
             deduplicationScope: messageGroup;                # optional - value : queue || messageGroup
+            contentBasedDeduplication: true                  # optional - value : boolean, in fifo, either contentBasedDeduplication:true or provide MessageDeduplicationId 
             deadLetterMessageRetentionPeriodSeconds: 1209600 # optional - AWS default is 345600 secs (4 days)
             enabled: true                                    # optional - AWS default is true
             visibilityTimeout: 30                            # optional - AWS default is 30 seconds
@@ -323,6 +333,7 @@ Usage
       isFifoQueue: config.isFifoQueue,
       fifoThroughputLimit: config.fifoThroughputLimit,
       deduplicationScope: config.deduplicationScope,
+      contentBasedDeduplication: config.contentBasedDeduplication,
       deadLetterMessageRetentionPeriodSeconds:
         config.deadLetterMessageRetentionPeriodSeconds,
       enabled: config.enabled,
@@ -400,6 +411,7 @@ Usage
       isFifoQueue,
       fifoThroughputLimit,
       deduplicationScope,
+      contentBasedDeduplication,
       deadLetterMessageRetentionPeriodSeconds,
       deadLetterQueueOverride,
       isDisableDLQ
@@ -434,7 +446,15 @@ Usage
                   ? {
                       DeduplicationScope: deduplicationScope
                     }
-                  : {})
+                  : {}),
+                ...(contentBasedDeduplication !== undefined
+                  ? {
+                      ContentBasedDeduplication: contentBasedDeduplication
+                    }
+                  : {
+                      // Should throw error instead
+                      // ContentBasedDeduplication: true // to avoid error, will be overwritten by MessageDeduplicationId
+                    })
               }
             : {}),
 
@@ -468,6 +488,7 @@ Usage
       isFifoQueue,
       fifoThroughputLimit,
       deduplicationScope,
+      contentBasedDeduplication,
       visibilityTimeout,
       mainQueueOverride,
       isDisableDLQ
@@ -509,7 +530,15 @@ Usage
                 ? {
                     DeduplicationScope: deduplicationScope
                   }
-                : {})
+                : {}),
+              ...(contentBasedDeduplication !== undefined
+                ? {
+                    ContentBasedDeduplication: contentBasedDeduplication
+                  }
+                : {
+                    // Should throw error instead
+                    // ContentBasedDeduplication: true // to avoid error, will be overwritten by MessageDeduplicationId
+                  })
             }
           : {}),
 

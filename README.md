@@ -115,6 +115,7 @@ functions:
           isFifoQueue: true;                                 # optional - AWS default is false
           fifoThroughputLimit: perMessageGroupId;          # optional - value : perQueue || perMessageGroupId
           deduplicationScope: messageGroup;                # optional - value : queue || messageGroup
+          contentBasedDeduplication: true                  # optional - value : boolean, in fifo, either true or provide MessageDeduplicationId, will be overwrite by MessageDeduplicationId(if any) - consider to be true
           iamRoleName: LambdaRole # default is IamRoleLambdaExecution
           isDisableDLQ: true # optional - default is false
           deadLetterMessageRetentionPeriodSeconds: 1209600 # optional - AWS default is 345600 secs (4 days)
