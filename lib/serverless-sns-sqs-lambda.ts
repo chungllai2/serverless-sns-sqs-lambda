@@ -257,16 +257,18 @@ export default class ServerlessSnsSqsLambda {
   validateConfig(funcName, stage, config): Config {
     if (
       !config.topicArn ||
-      !config.name ||
-      (config.isFifoQueue === true &&
-        config.contentBasedDeduplication === undefined)
+      !config.name
+      // ||
+      // (config.isFifoQueue === true &&
+      //   config.contentBasedDeduplication === undefined && )
+      // - fifo was [${config.isFifoQueue}], contentBasedDeduplication was [${config.contentBasedDeduplication}]
     ) {
       throw new Error(`Error:
 When creating an snsSqs handler, you must define the name and topicArn.
 In function [${funcName}]:
 - name was [${config.name}]
 - topicArn was [${config.topicArn}].
-- fifo was [${config.isFifoQueue}], contentBasedDeduplication was [${config.contentBasedDeduplication}]
+
 
 Usage
 -----

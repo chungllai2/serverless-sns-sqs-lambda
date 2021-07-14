@@ -67,16 +67,17 @@ describe("Test Serverless SNS SQS Lambda", () => {
     }).toThrow(/topicArn was \[undefined\]/);
   });
 
-  it("should fail if FIFO but contentBasedDeduplication is not passed", () => {
-    expect.assertions(1);
-    expect(() => {
-      serverlessSnsSqsLambda.validateConfig("func-name", "stage", {
-        topicArn: "topicArn",
-        name: "name",
-        isFifoQueue: true
-      });
-    }).toThrow(/contentBasedDeduplication was \[undefined\]/);
-  });
+  // Will throw error - if adopting MessageDeduplicationId
+  // it("should fail if FIFO but contentBasedDeduplication is not passed", () => {
+  //   expect.assertions(1);
+  //   expect(() => {
+  //     serverlessSnsSqsLambda.validateConfig("func-name", "stage", {
+  //       topicArn: "topicArn",
+  //       name: "name",
+  //       isFifoQueue: true
+  //     });
+  //   }).toThrow(/contentBasedDeduplication was \[undefined\]/);
+  // });
 
   describe("when no optional parameters are provided", () => {
     it("should produce valid SQS CF template items", () => {
