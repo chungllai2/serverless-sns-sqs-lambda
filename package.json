@@ -4,10 +4,7 @@
   "description": "serverless plugin to make serverless-sns-sqs-lambda events",
   "main": "dist/index.js",
   "scripts": {
-    "test": "eslint lib/**/*.ts && jest --clearCache lib && jest --runInBand lib",
-    "build": "tsc",
-    "commit": "git-cz",
-    "prepack": "tsc"
+    "test": "eslint lib/**/*.ts && jest --clearCache lib && jest --runInBand lib"
   },
   "repository": {
     "type": "git",
