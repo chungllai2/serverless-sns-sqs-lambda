@@ -280,7 +280,7 @@ Usage
         - snsSqs:
             name: Event                                      # required
             topicArn: !Ref TopicArn                          # required
-            prefix: some-prefix                              # optional - default is \`\${this.serviceName}-\${stage}-\${funcNamePascalCase}\`
+            prefix: some-prefix                              # optional - default is \`\${this.serviceName}-\${stage}-\`
             maxRetryCount: 2                                 # optional - default is 5
             batchSize: 1                                     # optional - default is 10
             batchWindow: 10                                  # optional - default is 0 (no batch window)
@@ -327,8 +327,7 @@ Usage
       ...config,
       name: config.name,
       funcName: funcNamePascalCase,
-      prefix:
-        config.prefix || `${this.serviceName}-${stage}-${funcNamePascalCase}`,
+      prefix: config.prefix || `${this.serviceName}-${stage}-`,
       batchSize: parseIntOr(config.batchSize, 10),
       maxRetryCount: parseIntOr(config.maxRetryCount, 5),
       kmsMasterKeyId: config.kmsMasterKeyId,
